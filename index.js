@@ -19,6 +19,11 @@ const grantAccessContainer = document.querySelector(".grant-location-container")
 const searchForm = document.querySelector("[data-seaerchForm]");
 const loadingScreen = document.querySelector(".loading-container");
 const userInfoContainer = document.querySelector(".user-info-container");
+const messageText = document.querySelector("[data-messageText]");
+const apiErrorContainer = document.querySelector(".api-error-container");
+const apiErrorImg = document.querySelector("[data-notFoundImg]");
+const apiErrorMessage = document.querySelector("[data-apiErrorText]");
+const apiErrorBtn = document.querySelector("[data-apiErrorBtn]");
 
 const API_KEY = "d1845658f92b31c64bd94f06f7188c9c";
 
@@ -37,6 +42,7 @@ searchTab.addEventListener("click", () => {
 });
 
 function switchTab(clickedTab) {
+    apiErrorContainer.classList.remove("active");
     if (clickedTab != currentTab) {
         currentTab.classList.remove('current-tab');
         currentTab = clickedTab;
@@ -79,6 +85,9 @@ async function fetchUserWeatherInfo(coordinates) {
             `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${API_KEY}&units=metric`
           );
           const data = await res.json();
+          if (!data.sys) {
+            throw data;
+          }
 
           loadingScreen.classList.remove("active");
           userInfoContainer.classList.add("active");
@@ -86,10 +95,10 @@ async function fetchUserWeatherInfo(coordinates) {
           renderWeatherInfo(data);
     } catch(e) {
         loadingScreen.classList.remove("active");
-        // apiErrorContainer.classList.add("active");
-        // apiErrorImg.style.display = "none";
-        // apiErrorMessage.innerText = `Error: ${e?.message}`;
-        // apiErrorBtn.addEventListener("click", fetchUserWeatherInfo);
+        apiErrorContainer.classList.add("active");
+        apiErrorImg.style.display = "none";
+        apiErrorMessage.innerText = `Error: ${e?.message}`;
+        apiErrorBtn.addEventListener("click", fetchUserWeatherInfo);
     }
 }
 
@@ -115,9 +124,10 @@ function renderWeatherInfo(data) {
 
 function getLocation(){
     if(navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(showPosition);
+        navigator.geolocation.getCurrentPosition(showPosition, showError);
     } else {
-        alert("No geolocation support available");
+        grantAccessBtn.style.display = "none";
+        messageText.innerText = "Geolocation is not supported by this browser.";
     }
 }
 
@@ -131,6 +141,24 @@ function showPosition(position) {
     fetchUserWeatherInfo(userCoordinates);
 }
 
+// Handle any errors
+function showError(error) {
+    switch (error.code) {
+      case error.PERMISSION_DENIED:
+        messageText.innerText = "You denied the request for Geolocation.";
+        break;
+      case error.POSITION_UNAVAILABLE:
+        messageText.innerText = "Location information is unavailable.";
+        break;
+      case error.TIMEOUT:
+        messageText.innerText = "The request to get user location timed out.";
+        break;
+      case error.UNKNOWN_ERROR:
+        messageText.innerText = "An unknown error occurred.";
+        break;
+    }
+}
+
 const grantAccessBtn = document.querySelector("[data-grantAccess]");
 grantAccessBtn.addEventListener("click", getLocation);
 
@@ -141,19 +169,27 @@ searchForm.addEventListener("submit", (e) => {
         return;
     }
     fetchSearchWeatherInfo(searchInput.value);
+    searchInput.value = "";
 });
 
 async function fetchSearchWeatherInfo(city) {
     loadingScreen.classList.add("active");
     userInfoContainer.classList.remove("active");
     grantAccessContainer.classList.remove("active");
+    apiErrorContainer.classList.remove("active");
     try {
         const res = await fetch(`https://api.openweathermap.org/data/2.5/weather?q=${city}&appid=${API_KEY}&units=metric`);
         const data = await res.json();
+        if (!data.sys) {
+            throw data;
+        }
         loadingScreen.classList.remove("active");
         userInfoContainer.classList.add("active");
         renderWeatherInfo(data);
     } catch(err) {
-        console.log("Error occured : ",err);
+        loadingScreen.classList.remove("active");
+        apiErrorContainer.classList.add("active");
+        apiErrorMessage.innerText = `${err?.message}`;
+        apiErrorBtn.style.display = "none";
     }
 }
